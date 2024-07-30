@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expenditure Data</title>
+</head>
+<body>
+    <h1>Worldometer Expenditure Data</h1>
+    {% if data %}
+        <div>
+            <h2>Public Healthcare Expenditure Today:</h2>
+            <p>${{ data.public_healthcare_expenditure_today }}</p>
+
+            <h2>Public Education Expenditure Today:</h2>
+            <p>${{ data.public_education_expenditure_today }}</p>
+        </div>
+    {% else %}
+        <p>Error: {{ error }}</p>
+    {% endif %}
+</body>
+</html>

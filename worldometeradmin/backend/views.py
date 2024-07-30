@@ -1,0 +1,164 @@
+from django.shortcuts import render
+from django.http import HttpResponse
+import asyncio
+from django.shortcuts import render
+from django.http import JsonResponse,HttpResponse
+from worldometer.world import WorldCounters
+from asgiref.sync import async_to_sync
+import os
+import nest_asyncio
+import requests
+from bs4 import BeautifulSoup
+nest_asyncio.apply()
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
+PYPPETEER_CHROMIUM_REVISION = '1263111'
+os.environ['PYPPETEER_CHROMIUM_REVISION'] = PYPPETEER_CHROMIUM_REVISION
+
+def setup_driver():
+    # Set up Chrome options
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Example: Run in headless mode
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])  # Suppresses DevTools logs.
+    chrome_options.add_argument('--blink-settings=imagesEnabled=false')
+    chrome_options.add_argument('--disable-gpu')  # Disable GPU hardware acceleration
+    chrome_options.add_argument('--disable-stylesheets')  # Experiment with disabling stylesheets
+
+    # Set up Chrome driver
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    return driver
+
+def fetch_population_with_selenium():
+    driver = setup_driver()
+    try:
+        driver.get("https://www.worldometers.info/world-population/")
+        # Wait for the element to be loaded
+        element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".maincounter-number span"))
+        )
+        population = element.text
+        return population
+    finally:
+        driver.quit()
+
+
+def scrape_worldometer_data():
+    driver = setup_driver()
+    url = "https://www.worldometers.info/world-population/"
+    driver.get(url)
+    
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "col-sm-6"))
+        )
+        data = {
+            'births_today': driver.find_element(By.CSS_SELECTOR, "[rel='births_today']").text,
+            'deaths_today': driver.find_element(By.CSS_SELECTOR, "[rel='dth1s_today']").text,
+            'population_growth_today': driver.find_element(By.CSS_SELECTOR, "[rel='absolute_growth']").text,
+            'births_this_year': driver.find_element(By.CSS_SELECTOR, "[rel='births_this_year']").text.replace(',', ''),
+            'deaths_this_year': driver.find_element(By.CSS_SELECTOR, "[rel='dth1s_this_year']").text.replace(',', ''),
+            'expenditure_this_year': driver.find_element(By.CSS_SELECTOR,"[rel='gov_expenditures_health/today']").text.replace(',', ''),
+            
+            # Add further selectors for yearly data if available on the same page
+        }
+    finally:
+        driver.quit()
+    
+    return data
+
+
+
+
+def scrape_expenditure_data():
+    driver = setup_driver()
+    url = "https://www.worldometers.info/"
+    driver.get(url)
+    
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "gov_expenditures_health"))
+        )
+        data = {
+            "world_population":driver.find_element(By.CSS_SELECTOR, "[rel='current_population']").text.replace(',', ''),
+            "births_this_year":driver.find_element(By.CSS_SELECTOR, "[rel='births_this_year']").text.replace(',', ''),
+            "births_today":driver.find_element(By.CSS_SELECTOR, "[rel='births_today']").text.replace(',', ''),
+            "deaths_this_year":driver.find_element(By.CSS_SELECTOR, "[rel='dth1s_this_year']").text.replace(',', ''),
+            "death_today":driver.find_element(By.CSS_SELECTOR, "[rel='dth1s_today']").text.replace(',', ''),
+            'expenditure_healthcare_this_year': driver.find_element(By.CSS_SELECTOR, "[rel='gov_expenditures_health/today']").text.replace(',', ''),
+            'expenditure_education_this_year': driver.find_element(By.CSS_SELECTOR, "[rel='gov_expenditures_education/today']").text.replace(',', ''),
+            'cars_produced_this_year': driver.find_element(By.CSS_SELECTOR, "[rel='automobile_produced/this_year']").text.replace(',', ''),
+            'computers_produced_this_year': driver.find_element(By.CSS_SELECTOR, "[rel='computers_sold/this_year']").text.replace(',', ''),
+             "new_book_titles_published":driver.find_element(By.CSS_SELECTOR, "[rel='books_published/this_year']").text.replace(',', ''),
+             "newspaper_circilated_today":driver.find_element(By.CSS_SELECTOR, "[rel='newspapers_circulated/today']").text.replace(',', ''),
+             "money_spent_on_vediogames":driver.find_element(By.CSS_SELECTOR, "[rel='videogames/today']").text.replace(',', ''),
+             "internet_users_today":driver.find_element(By.CSS_SELECTOR, "[rel='internet_users']").text.replace(',', ''),
+             "email_sent_today":driver.find_element(By.CSS_SELECTOR, "[rel='em/today']").text.replace(',', ''),
+             "google_searches_today":driver.find_element(By.CSS_SELECTOR, "[rel='google_searches/today']").text.replace(',', ''),
+             "forest_lost_this_year":driver.find_element(By.CSS_SELECTOR, "[rel='forest_loss/this_year']").text.replace(',', ''),
+             "co2_emmision_this_year":driver.find_element(By.CSS_SELECTOR, "[rel='co2_emissions/this_year']").text.replace(',', ''),
+             "overweight_people":driver.find_element(By.CSS_SELECTOR, "[rel='overweight']").text.replace(',', ''),
+             "obese_people":driver.find_element(By.CSS_SELECTOR, "[rel='obese']").text.replace(',', ''),
+             "deied_of_hunger":driver.find_element(By.CSS_SELECTOR, "[rel='dth1_hunger/today']").text.replace(',', ''),
+             "water_consumed":driver.find_element(By.CSS_SELECTOR, "[rel='water_consumed/this_year']").text.replace(',', ''),
+             "energy_consumed":driver.find_element(By.CSS_SELECTOR, "[rel='energy_used/today']").text.replace(',', ''),
+             "oil_consumption":driver.find_element(By.CSS_SELECTOR, "[rel='oil_consumption']").text.replace(',', ''),
+             "natural_gas_left":driver.find_element(By.CSS_SELECTOR, "[rel='gas_reserves']").text.replace(',', ''),
+             "abortion":driver.find_element(By.CSS_SELECTOR, "[rel='ab/this_year']").text.replace(',', ''),
+             "infection":driver.find_element(By.CSS_SELECTOR, "[rel='infections_hiv']").text.replace(',', ''),
+             "cigerates_smoked":driver.find_element(By.CSS_SELECTOR, "[rel='cigarettes_smoked/today']").text.replace(',', ''),
+             "death_caused_by_smoking":driver.find_element(By.CSS_SELECTOR, "[rel='dth1s_cigarettes/this_year']").text.replace(',', ''),
+             "death_alchol":driver.find_element(By.CSS_SELECTOR, "[rel='dth1s_alchool/this_year']").text.replace(',', ''),
+             "sucide":driver.find_element(By.CSS_SELECTOR, "[rel='sui/this_year']").text.replace(',', ''),
+            # Add further selectors for yearly data if available on the same page
+        }
+    finally:
+        driver.quit()
+    
+    return data
+
+
+def members(request):
+    return HttpResponse("Hello world!")
+
+def population_view(request):
+    try:
+        population = fetch_population_with_selenium()
+        return HttpResponse(population)
+    except Exception as e:
+        return HttpResponse(f"Failed to retrieve data: {str(e)}", status=500)
+
+
+#birth and death views
+
+async def birth_and_death_view(request):
+    # Your asynchronous view content here
+    return JsonResponse({"message": "This is an async view"})
+
+
+
+def worldometer_view(request):
+    try:
+        data = scrape_worldometer_data()
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+
+def worldometer_expenditure_view(request):
+    try:
+        data = scrape_expenditure_data()
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+
+
+
