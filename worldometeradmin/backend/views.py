@@ -3,7 +3,7 @@ from django.http import HttpResponse
 import asyncio
 from django.shortcuts import render
 from django.http import JsonResponse,HttpResponse
-from worldometer.world import WorldCounters
+
 from asgiref.sync import async_to_sync
 import os
 import nest_asyncio
