@@ -6,10 +6,10 @@ from django.http import JsonResponse,HttpResponse
 
 from asgiref.sync import async_to_sync
 import os
-import nest_asyncio
+
 import requests
 from bs4 import BeautifulSoup
-nest_asyncio.apply()
+
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
